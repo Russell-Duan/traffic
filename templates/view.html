@@ -1,0 +1,8 @@
+{% block header %}
+  <h1 style="color:skyblue;font-family:Monaco">{% block title %}Some fantastic messages{% endblock %}</h1>
+{% endblock %}
+{% block content %}
+{% for i in res %}
+  <p style="color:darkseagreen;font-family:Monaco">{{i[2]}} - {{i[1]}} </p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,36 @@
+<body>
+
+  <h1 style="color:skyblue;font-family:Monaco">{% block title %}Traffic Density Map of LA County{% endblock %}</h1>
+  <div id='chart' class='chart'”></div>
+</body><script src='https://cdn.plot.ly/plotly-latest.min.js'></script>
+
+<script type='text/javascript'>
+  var graphs = {{graphJSON | safe}};
+  Plotly.plot('chart',graphs,{});
+</script>
+
+{% block content %}
+
+  <form method="post">
+    <label for="name">From(0001-2716):</label>
+    <br>
+    <input type="text" name="from" id="from">
+    <br>
+    <label for="handle">To(0001-2716):</label>
+    <br>
+    <input type="text" name="to" id="to">
+    <br>
+    <label for="name">Day of Week(1-7):</label>
+    <br>
+    <input type="text" name="dow" id="dow">
+    <br>
+    <label for="handle">Hour of Day(0-23):</label>
+    <br>
+    <input type="text" name="hod" id="hod">
+    <br>
+    <input type="submit" value="Submit form">
+</form>
+
+
+{% endblock %}
+
