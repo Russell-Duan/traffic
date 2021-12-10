@@ -9,8 +9,6 @@ import networkx as nx
 import os
 import requests
 
-import sqlite3
-
 # flask app
 app = Flask(__name__)
 
@@ -39,7 +37,7 @@ def time_estimation(G, df, start_node, end_node, w_of_day, h_of_day, wk_coef):
         else:
             time_estimation += float(df.loc[(df['sourceid'] == int(path_list[i])) & (df['dstid'] == int(path_list[i + 1])) & (df['hod'] == h_of_day)]['mean_travel_time'])
 
-    time_estimation = wk_coef[w_of_day] * time_estimation
+    time_estimation = wk_coef.iloc[w_of_day-1]['mean_travel_time'] * time_estimation
 
     return str(round(time_estimation / 60, 2)) + " minutes"
 
@@ -125,7 +123,7 @@ def save_response_content(response, destination):
 
 @app.route('/')
 def main_page():
-    fig = plotly.io.read_json(os.getcwd()+'\\data\\graph.json')
+    fig = plotly.io.read_json(os.getcwd()+'/data/graph.json')
     fig.update_layout(
         showlegend=False,
         autosize=False,
@@ -148,13 +146,12 @@ def parse_urls():
         w_of_day = int(request.form['dow'])
         h_of_day = int(request.form['hod'])
         try:
-            df = pd.read_csv(os.getcwd()+"\\data\\traffic_data.csv")
+            df = pd.read_csv(os.getcwd()+"/data/traffic_data.csv")
         except FileNotFoundError:
-            download_file_from_google_drive("1pYEZFp9d0ibrX8BaV9cmM0hkgtJC0Gx", os.getcwd()+"\\data\\traffic_data.csv")
-            df = df = pd.read_csv(os.getcwd()+"\\data\\traffic_data.csv")
-        with open('os.getcwd()+"\\data\\coef.json') as json_file:
-            wk_coef = json.load(json_file)
-        G = nx.read_gpickle(os.getcwd()+"\\data\\graph.gpickle")
+            download_file_from_google_drive("1pYEZFp9d0ibrX8BaV9cmM0hkgtJC0Gxj", os.getcwd()+"/data/traffic_data.csv")
+            df = df = pd.read_csv(os.getcwd()+"/data/traffic_data.csv")
+        wk_coef = pd.read_csv(os.getcwd()+"/data/wk_coef.csv")
+        G = nx.read_gpickle(os.getcwd()+"/data/graph.gpickle")
         fig = shortest_path_plot(G=G, start_node=start_node, end_node=end_node)
         time = time_estimation(G=G, df=df, start_node=start_node, end_node=end_node, w_of_day=w_of_day, h_of_day=h_of_day, wk_coef=wk_coef)
         fig.update_layout(
@@ -170,3 +167,5 @@ def parse_urls():
                 pad=4))
         graph = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
         return render_template('submit.html', time=time, graph=graph)
+
+app.run()
