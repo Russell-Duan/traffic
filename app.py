@@ -1,3 +1,4 @@
+# import libraries
 from flask import Flask, render_template, request
 import pandas as pd
 import json
@@ -5,11 +6,15 @@ import plotly
 import plotly.express as px
 import plotly.graph_objs as go
 import networkx as nx
+import os
+import requests
 
 import sqlite3
 
+# flask app
 app = Flask(__name__)
 
+# time estimation model
 def time_estimation(G, df, start_node, end_node, w_of_day, h_of_day, wk_coef):
     time_estimation = 0
 
@@ -17,15 +22,15 @@ def time_estimation(G, df, start_node, end_node, w_of_day, h_of_day, wk_coef):
     path = nx.shortest_path(
         G=G,
         source=start_node,
-        target=end_node)
+        target=end_node) # save the shortest path
     temp = path[0][0:4]
     path_list.append(temp)
     for key in path:
         if key[0:4] != temp:
             temp = key[0:4]
-            path_list.append(temp)
+            path_list.append(temp) # area id in the shortest path
 
-    for i in range(len(path_list) - 1):
+    for i in range(len(path_list) - 1): # using past data to make the prediction
         if len(df.loc[(df['sourceid'] == int(path_list[i])) & (df['dstid'] == int(path_list[i + 1])) & (df['hod'] == h_of_day)]['mean_travel_time']) == 0:
             if len(df.loc[(df['sourceid'] == int(path_list[i])) & (df['dstid'] == int(path_list[i + 1]))]) == 0:
                 time_estimation += float(df.loc[(df['sourceid'] == int(path_list[i]))]['mean_travel_time'].min())
@@ -38,7 +43,7 @@ def time_estimation(G, df, start_node, end_node, w_of_day, h_of_day, wk_coef):
 
     return str(round(time_estimation / 60, 2)) + " minutes"
 
-
+# find the shortest path and make the plot
 def shortest_path_plot(G, start_node, end_node):
     edge_x = []
     edge_y = []
@@ -87,9 +92,40 @@ def shortest_path_plot(G, start_node, end_node):
 
     return fig
 
+
+# download traffic data from google drive
+def download_file_from_google_drive(id, destination):
+    URL = "https://docs.google.com/uc?export=download"
+
+    session = requests.Session()
+
+    response = session.get(URL, params = { 'id' : id }, stream = True)
+    token = get_confirm_token(response)
+
+    if token:
+        params = { 'id' : id, 'confirm' : token }
+        response = session.get(URL, params = params, stream = True)
+
+    save_response_content(response, destination)
+
+def get_confirm_token(response):
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            return value
+
+    return None
+
+def save_response_content(response, destination):
+    CHUNK_SIZE = 32768
+
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(CHUNK_SIZE):
+            if chunk: # filter out keep-alive new chunks
+                f.write(chunk)
+
 @app.route('/')
 def main_page():
-    fig = plotly.io.read_json('C:/Users/duanh/OneDrive/Documents/GitHub/traffic-density/data/graph.json')
+    fig = plotly.io.read_json(os.getcwd()+'\\data\\graph.json')
     fig.update_layout(
         showlegend=False,
         autosize=False,
@@ -111,10 +147,14 @@ def parse_urls():
         end_node = str(request.form['to'])+'-0-0'
         w_of_day = int(request.form['dow'])
         h_of_day = int(request.form['hod'])
-        df = pd.read_csv("C:/Users/duanh/OneDrive/Documents/GitHub/traffic-density/data/los_angeles-censustracts-2018-2-All-HourlyAggregate.csv")
-        wk = pd.read_csv("C:/Users/duanh/OneDrive/Documents/GitHub/traffic-density/data/los_angeles-censustracts-2018-1-WeeklyAggregate.csv")
-        wk_coef = wk.groupby(['dow'])['mean_travel_time'].mean() / wk.groupby(['dow'])['mean_travel_time'].mean()[7]
-        G = nx.read_gpickle("C:/Users/duanh/OneDrive/Documents/GitHub/traffic-density/data/graph.gpickle")
+        try:
+            df = pd.read_csv(os.getcwd()+"\\data\\traffic_data.csv")
+        except FileNotFoundError:
+            download_file_from_google_drive("1pYEZFp9d0ibrX8BaV9cmM0hkgtJC0Gx", os.getcwd()+"\\data\\traffic_data.csv")
+            df = df = pd.read_csv(os.getcwd()+"\\data\\traffic_data.csv")
+        with open('os.getcwd()+"\\data\\coef.json') as json_file:
+            wk_coef = json.load(json_file)
+        G = nx.read_gpickle(os.getcwd()+"\\data\\graph.gpickle")
         fig = shortest_path_plot(G=G, start_node=start_node, end_node=end_node)
         time = time_estimation(G=G, df=df, start_node=start_node, end_node=end_node, w_of_day=w_of_day, h_of_day=h_of_day, wk_coef=wk_coef)
         fig.update_layout(
